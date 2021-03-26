@@ -1,0 +1,6 @@
+name = Módulo Comparador
+description = Muestra la sección para comparar las versiones.
+package = Modules | Repo
+version = 0.1
+dependencies[] = field
+core = 7.x
