@@ -1,0 +1,463 @@
+<?php
+/**
+ * @file Modulo Comparador
+ * @author Miguel Martínez <miguel01amd@gmail.com>
+ * @package Modules | Repo
+ * @info Módulo para la comparación de diferentes versiones de automoviles 
+ * @vertion dev 1.0.0.0
+ */
+
+module_load_include('inc', 'comparator', 'comparator.field');
+/*
+ * Define los permisos para los usuarios
+ * Implements hook_permission().
+ */
+function comparator_permission() {
+  $perm = array(
+    'administer comparador' => array(
+      'title'       => t('administer comparador module'),
+      'description' => t('configure administer comparador module'),
+    ),
+    'create comparador' => array(
+      'title'       => t('Create custom comparador'),
+      'description' => t('Permit create custom comparador by user'),
+    ),
+    'view comparador' => array(
+      'title'       => t('view comparador'),
+      'description' => t('Permit viewer block comparador'),
+    ),
+  );
+  return $perm;
+}
+
+
+/**
+ * Define URL para página de comparador
+ * Implements hook_menu().
+ * @return array
+ */
+function comparator_menu(){
+  $items = array();
+  $items['seleccion-version/%'] = array(
+    'title'            => t(''),
+    'description'      => t('page to show and select versions of vehicle'),
+    'page callback'    => 'comparator_page_empty',
+    'access arguments' => array('view comparador'),
+  );
+  $items['comparador-versiones/%'] = array(
+    'title'            => t(''),
+    'description'      => t('page to compare versions of vehicle'),
+    'page callback'    => 'comparator_page_empty',
+    'access arguments' => array('view comparador'),
+  );
+
+  return $items;
+}
+
+/*
+ * Implements hook_block_info().
+ */
+function comparator_block_info() {
+  $blocks = array();
+  $blocks['versions'] = array(
+    'info'       => t('Versiones para comparador'),
+    'weight'     => -12,
+    'status'     => TRUE,
+    'region'     => 'content',
+    'cache'      => DRUPAL_NO_CACHE,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages'      => 'seleccion-version/*'
+  );
+  $blocks['versiones_comparador'] = array(
+    'info'       => t('Versiones Seleccionadas del comparador'),
+    'weight'     => -12,
+    'status'     => TRUE,
+    'region'     => 'content',
+    'cache'      => DRUPAL_NO_CACHE,
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages'      => 'comparador-versiones/*'
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function comparator_block_view($delta) {
+  $block = [];
+  switch ($delta) {
+    case 'versions':
+      if(user_access('view comparador')){
+        $block['content'] = comparator_get_versions();
+      }else{
+        $block['content'] = t('Not access view content');
+      }//endif
+    break;
+    case 'versiones_comparador':
+      if(user_access('view comparador')){
+        $block['content'] = comparator_get_content();
+      }else{
+        $block['content'] = t('Not access view content');
+      }//endif
+    break;
+
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function comparator_theme() {
+  $theme = array();
+  $theme['versions'] = array(
+    'variables' => array(
+      'items' => array(),
+      'class' => '',
+    ),
+    'template' => 'templates/seleccion-version',
+  );
+  $theme['versiones_comparador'] = array(
+    'variables' => array(
+      'items' => array(),
+      'class' => '',
+    ),
+    'template' => 'templates/versiones-comparador',
+  );
+
+
+  return $theme;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function comparator_page_empty() {
+  return "";
+}
+
+/**
+ * Devuelve los contenidos más recientes
+ * @return array
+ */
+function comparator_get_versions() {
+  global $base_url;
+  drupal_add_library('system', 'jquery.cookie');
+  drupal_add_js(drupal_get_path('module', 'comparator') . '/js/comparator.js');
+
+  $versions = [];
+  $path  = current_path();
+
+  $url   = explode('/', $path);
+  $alias = $url[1];
+  $tid   = comparator_alias_tid($alias);
+
+  $name = taxonomy_term_load($tid)->name;
+  $childrens  = taxonomy_get_children($tid);
+  $return_modelo = $base_url.'/modelo/'.$name;
+
+  if (!empty($childrens)) {
+    foreach ($childrens as $child) {
+      $img_tid = $child->field_imagen_vehiculos['und'][0]['fid'];
+      $img     = comparator_find_img($img_tid);
+      // External function
+      $alias_version = versions_find_alias($child->tid);
+      $path          = explode('/', $alias_version->alias);
+      $url           = $path[1];
+      $versions[$child->tid] = [
+        'id'      => $child->tid,
+        'version' => $child->name,
+        'price'   => $child->precio_vehiculo['und'][0]['value'],
+        'attribs' => $child->html['und'][0]['value'],
+        'img'     => $img,
+        'modelo'  => $name,
+        'detalle' => $base_url.'/versiones/'.$alias.'/'.$url,
+        'compara' => $base_url.'/comparador-versiones/'.$alias,
+        'return'  => $base_url.'/seleccion-version/'.$alias,
+        'cotiza'  => $base_url.'/configura-cotiza/exterior/'.$alias.'/'.$url,
+      ];
+    }//end foreach
+
+    drupal_add_js( array('comparator' => $name, 'versiones' => $versions), array('type' => 'setting') );
+    return theme('versions', array('versions' => $versions, 'return' => $return_modelo));
+  }//end if*/
+}
+
+/**
+ * Devuelve las caracteristicas de las versiones seleccionadas
+ * @return int
+ */
+function comparator_get_content() {
+  $nodo = $versions = $flagNids = [];
+
+  $seleccion = json_decode($_COOKIE["comparadorVersiones"]);
+  $tids = [$seleccion->versionUno->id, $seleccion->versionDos->id,];
+
+  foreach ($tids as $term) {
+    $color = $ext = $int = $seg = [];
+    $qry = db_select('node', 'n');
+    $qry->innerJoin('field_data_field_vehiculo', 'fv', 'fv.entity_id = n.nid');
+    $qry->innerJoin('field_data_field_comp_color', 'fcc', 'fcc.entity_id = n.nid');
+    $qry->innerJoin('field_data_field_comp_exterior', 'fce', 'fce.entity_id = n.nid');
+    $qry->innerJoin('field_data_field_comp_interior', 'fci', 'fci.entity_id = n.nid');
+    $qry->innerJoin('field_data_field_comp_seguridad', 'fcs', 'fcs.entity_id = n.nid');
+    $qry->condition('type', 'compare_version', '=')
+        ->condition('status', '1', '=')
+        ->condition('fv.field_vehiculo_tid', $term, '=');
+    $qry->fields('n', ['nid', 'title']);
+    $qry->fields('fv', ['field_vehiculo_tid']);
+    $qry->fields('fcc', ['field_comp_color_tid']);
+    $qry->fields('fce', ['field_comp_exterior_tid']);
+    $qry->fields('fci', ['field_comp_interior_tid']);
+    $qry->fields('fcs', ['field_comp_seguridad_tid']);
+    $results = $qry->execute();
+
+    while($record = $results->fetchAssoc()) {
+      if (isset($record['nid']) && !empty($record['nid'])) {
+        if (in_array($record['field_comp_color_tid'], $color) == FALSE) {
+          $color[] = $record['field_comp_color_tid'];
+        }//end if
+        if (in_array($record['field_comp_exterior_tid'], $ext) == FALSE) {
+          $ext[] = $record['field_comp_exterior_tid'];
+        }//end if
+        if (in_array($record['field_comp_interior_tid'], $int) == FALSE) {
+          $int[] = $record['field_comp_interior_tid'];
+        }//end if
+        if (in_array($record['field_comp_seguridad_tid'], $seg) == FALSE) {
+          $seg[] = $record['field_comp_seguridad_tid'];
+        }//end if
+
+        $nid    = $record['nid'];
+        $name   = $record['title'];
+        $modelo = $record['field_vehiculo_tid'];
+        if (in_array($nid, $flagNids) == FALSE) {
+          $flagNids[] = $nid;
+        }
+      }//end if
+    }//end while
+    if (isset($nid) && !empty($nid)) {
+      $tecnicas = comparator_get_fields($nid, 'tecnicas', 'tecnicas_tid_tec', 'tecnicas_value');
+      $dimex    = comparator_get_fields($nid, 'dimex', 'dimex_tid_dimex', 'dimex_value');
+      $dimin    = comparator_get_fields($nid, 'dimin', 'dimin_tid_dimin', 'dimin_value');
+      $peso     = comparator_get_fields($nid, 'peso', 'peso_tid_peso', 'peso_value');
+
+      $nodo[] = [
+        'nid'       => $nid,
+        'title'     => $name,
+        'modelo'    => $modelo,
+        'color'     => comparator_get_colors($color),
+        'exterior'  => $ext,
+        'interior'  => $int,
+        'seguridad' => $seg,
+        'tecnicas'  => $tecnicas,
+        'dimex'     => $dimex,
+        'dimin'     => $dimin,
+        'peso'      => $peso,
+      ];
+
+    }//end if
+  }//end foreach
+  if (isset($flagNids[1]) && !empty($flagNids[1]) ) {
+    $versions = [
+      'color1'    => $nodo[0]['color'],
+      'color2'    => $nodo[1]['color'],
+      'exterior'  => comparator_comparator_versions($nodo, 'exterior'),
+      'interior'  => comparator_comparator_versions($nodo, 'interior'),
+      'seguridad' => comparator_comparator_versions($nodo, 'seguridad'),
+      'tecnicas'  => comparator_comparator_custom($nodo, 'tecnicas'),
+      'dimex'     => comparator_comparator_custom($nodo, 'dimex'),
+      'dimin'     => comparator_comparator_custom($nodo, 'dimin'),
+      'peso'      => comparator_comparator_custom($nodo, 'peso'),
+    ];
+
+    return theme('versiones_comparador', array('content' => $versions, 'selects' => $seleccion));
+  }//end if
+  else {
+    drupal_set_message('Aún no hay contenido para alguna de las versiones solicitadas', 'warning');
+  }
+}
+
+/**
+ * Devuelve campos custom del nodo
+ * @return array
+ */
+function comparator_get_fields($nid, $name, $tid, $value) {
+  $field  = 'field_data_field_comp_'.$name;
+  $fid    = 'field_comp_'.$tid;
+  $fvalue = 'field_comp_'.$value;
+
+  $field_comp = [];
+  $qry = db_select('node', 'n');
+  $qry ->innerJoin($field, 'fcf', 'fcf.entity_id = n.nid');
+  $qry->condition('type', 'compare_version', '=')
+      ->condition('status', '1', '=')
+      ->condition('nid', $nid, '=');
+  $qry->fields('fcf', [$fid, $fvalue]);
+  $qry->orderBy('fcf.delta', 'ASC');
+
+  $results = $qry->execute();
+
+  while ($row = $results->fetchAssoc()) {
+    $field_comp[$row[$fid]] = $row[$fvalue] ;
+  }
+  return $field_comp;
+}
+
+/**
+ * Compara los fields entre ambas versiones y regresa un único array ordenado
+ * @return array
+ */
+function comparator_comparator_versions($nodo, $key) {
+  $comp = $field_comp = [];
+
+  if (!empty($nodo[0][$key]) || !empty($nodo[1][$key])) {
+	  foreach ($nodo[1][$key] as $value) {
+	    if (in_array($value, $nodo[0][$key]) == TRUE) {
+	      $comp[] = [
+	        'tid'   => $value,
+	        'value' => 0
+	      ];
+	    }
+	    else {
+	      $comp[] = [
+	        'tid'   => $value,
+	        'value' => 2
+	      ];
+	    }//end if
+	  }//end foreach
+
+	  foreach ($nodo[0][$key] as $value) {
+	    if (in_array($value, $nodo[1][$key]) == FALSE) {
+	      $comp[] = [
+	        'tid'   => $value,
+	        'value' => 1
+	      ];
+	    }//end if
+	  }//end foreach
+
+	  foreach ($comp as $tid) {
+	    $qry = db_select('taxonomy_term_data', 'ttd');
+	    $qry->condition('ttd.tid', $tid['tid'], '=');
+	    $qry->fields('ttd', ['name', 'weight', 'tid']);
+      $qry->orderBy('ttd.weight', 'ASC');
+	    $result = $qry->execute()->fetchAssoc();
+
+	    $field_comp[] = [
+	      'caract' => $result['name'],
+	      'value'  => $tid['value'],
+	    ];
+	  }//end foreach
+	  asort($field_comp);
+	}
+  return $field_comp;
+}
+
+/**
+ * Compara los fields custom entre ambas versiones y regresa un único array ordenado
+ * @return array
+ */
+function comparator_comparator_custom($nodo, $key) {
+  $comp = $field_comp = [];
+
+  foreach ($nodo[1][$key] as $tid => $value2) {
+    if (array_key_exists($tid, $nodo[0][$key]) == TRUE) {
+      $comp[] = [
+        'tid'    => $tid,
+        'value1' => $nodo[0][$key][$tid],
+        'value2' => $value2
+      ];
+    }
+    else {
+      $comp[] = [
+        'tid'    => $tid,
+        'value1' => "--",
+        'value2' => $value2
+      ];
+    }//end if
+  }//end foreach
+
+  foreach ($nodo[0][$key] as $tid => $value1) {
+    if (array_key_exists($tid, $nodo[1][$key]) == FALSE) {
+      $comp[] = [
+        'tid'    => $tid,
+        'value1' => $value1,
+        'value2' => "--",
+      ];
+    }//end if
+  }//end foreach
+
+  foreach ($comp as $custom) {
+    $qry = db_select('taxonomy_term_data', 'ttd');
+    $qry->condition('ttd.tid', $custom['tid'], '=');
+    $qry->fields('ttd', ['name', 'weight', 'tid']);
+    $result = $qry->execute()->fetchAssoc();
+
+    $field_comp[$result['weight']] = [
+      'caract' => $result['name'],
+      'value1' => $custom['value1'],
+      'value2' => $custom['value2'],
+    ];
+  }//end foreach
+
+  ksort($field_comp);
+  return $field_comp;
+}
+
+/**
+ * devuelve los colores de las versiones
+ * @return int
+ */
+function comparator_get_colors($colores) {
+  if (!empty($colores)) {
+    foreach ($colores as $color) {
+      $qry = db_select('taxonomy_term_data', 'ttd');
+      $qry->condition('ttd.tid', $color, '=');
+      $qry->fields('ttd', ['description', 'weight']);
+      $result = $qry->execute()->fetchAssoc();
+
+      $field_colors[$result['weight']] = [
+        'color' => $result['description'],
+      ];
+    }//end foreach
+
+    return $field_colors;
+  }
+}
+
+
+/**
+ * Devuelve alias de la url solicitada
+ * @return int
+ */
+function comparator_alias_tid($name) {
+  $alias = 'modelo/'.$name;
+  $qry = db_select('url_alias', 'ua');
+  $qry->condition('ua.alias', $alias, '=');
+  $qry->fields('ua', ['source']);
+  $results = $qry->execute()->fetchAll();
+  if (isset($results) && !empty($results)) {
+    foreach ($results as $result) {
+      $source = $result->source;
+      $term   = explode('/', $source);
+      $tid    = $term[2];
+    }//ebd foreach
+    return $tid;
+  }//ebd if
+}
+
+/**
+ * @info get url file by id file
+ * @param (int) $fid
+ * @return (string)
+ */
+function comparator_find_img($fid){
+  if (isset($fid) && !empty($fid)) {
+    $file = file_load($fid);
+    $imguri = file_create_url($file->uri);
+  }
+  else {
+    $imguri = FALSE;
+  }
+  return $imguri;
+}

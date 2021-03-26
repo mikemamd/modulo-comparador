@@ -1,0 +1,457 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the comparator module.
+ */
+
+/**
+ * Implements hook_field_schema()
+ */
+function comparator_field_schema($field) {
+  $fields = array();
+  switch($field['type']){
+    case 'tecnica':
+      $fields = array(
+        'columns' => array(
+          'tid_tec' => array(
+            'type'     => 'int',
+            'default'  => 0,
+            'not null' => TRUE
+          ),
+          'value' => array(
+            'type'     => 'varchar',
+            'default'  => " ",
+            'length'   => 250,
+            'not null' => FALSE,
+          ),
+        )
+      );
+      break;
+    case 'dimex':
+      $fields = array(
+        'columns' => array(
+          'tid_dimex' => array(
+            'type'     => 'int',
+            'default'  => 0,
+            'not null' => TRUE
+          ),
+          'value' => array(
+            'type'     => 'varchar',
+            'default'  => " ",
+            'length'   => 250,
+            'not null' => FALSE,
+          ),
+        )
+      );
+      break;
+    case 'dimin':
+      $fields = array(
+        'columns' => array(
+          'tid_dimin' => array(
+            'type'     => 'int',
+            'default'  => 0,
+            'not null' => TRUE
+          ),
+          'value' => array(
+            'type'     => 'varchar',
+            'default'  => " ",
+            'length'   => 250,
+            'not null' => FALSE,
+          ),
+        )
+      );
+      break;
+    case 'peso_cap':
+      $fields = array(
+        'columns' => array(
+          'tid_peso' => array(
+            'type'     => 'int',
+            'default'  => 0,
+            'not null' => TRUE
+          ),
+          'value' => array(
+            'type'     => 'varchar',
+            'default'  => " ",
+            'length'   => 250,
+            'not null' => FALSE,
+          ),
+        )
+      );
+      break;
+  }//end switch
+  return $fields;
+}
+
+/**
+ * Implements hook_install().
+ */
+function comparator_install() {
+  $content_type = array(
+    'type'          => 'compare_version',
+    'name'          => t('Comparador de Versión'),
+    'description'   => t('Use para cargar los atributos a comparar de una versión'),
+    'title_label'   => t('Title'),
+    'base'          => 'node_content',
+    'custom'        => TRUE,
+  );
+  $node_type = node_type_set_defaults($content_type);
+  node_type_save($node_type);
+
+  //Se crean fields
+  field_info_cache_clear();
+  $fields = array(
+    'color_comp' => array(
+      'field_name'   => 'field_comp_color',
+      'type'         => 'taxonomy_term_reference',
+      'cardinality'  => -1,
+      'settings'     => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'color',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'exterior_comp' => array(
+      'field_name'   => 'field_comp_exterior',
+      'type'         => 'taxonomy_term_reference',
+      'cardinality'  => -1,
+      'settings'     => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'comparador_exterior',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'interior_comp' => array(
+      'field_name'   => 'field_comp_interior',
+      'type'         => 'taxonomy_term_reference',
+      'cardinality'  => -1,
+      'settings'     => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'comparador_interior',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'seguridad_comp' => array(
+      'field_name'    => 'field_comp_seguridad',
+      'type'          => 'taxonomy_term_reference',
+      'cardinality'   => -1,
+      'settings'      => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'comparador_seguridad',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'tecnica' => array(
+      'field_name'  => 'field_comp_tecnicas',
+      'type'        => 'tecnica',
+      'cardinality' => -1
+    ),
+    'dimex' => array(
+      'field_name'  => 'field_comp_dimex',
+      'type'        => 'dimex',
+      'cardinality' => -1
+    ),
+    'dimin' => array(
+      'field_name'  => 'field_comp_dimin',
+      'type'        => 'dimin',
+      'cardinality' => -1
+    ),
+    'peso_cap' => array(
+      'field_name'  => 'field_comp_peso',
+      'type'        => 'peso_cap',
+      'cardinality' => -1
+    ),
+  );
+
+  foreach($fields as $field) {
+    if( !field_info_field($field['field_name']) ){
+      field_create_field($field);
+    }//end if
+  }//end foreach
+
+  //Se definen taxonomias
+  $vocabularies_comp = array(
+    'comparador_exterior' => (object) array(
+      'name'         => 'Comparador - Exterior',
+      'machine_name' => 'comparador_exterior',
+      'description'  => t('Cátalogo de caracteristícas Exteriores de comparador'),
+      'module'       => 'comparator',
+    ),
+    'comparador_interior' => (object) array(
+      'name'         => 'Comparador - Interior',
+      'machine_name' => 'comparador_interior',
+      'description'  => t('Cátalogo de caracteristícas Interiores de comparador'),
+      'module'       => 'comparator',
+    ),
+    'comparador_seguridad' => (object) array(
+      'name'         => 'Comparador - Seguridad',
+      'machine_name' => 'comparador_seguridad',
+      'description'  => t('Cátalogo de caracteristícas de Segurida de comparador'),
+      'module'       => 'comparator',
+    ),
+    'comparador_tecnicas' => (object) array(
+      'name'         => 'Comparador - Especificaciones Técnicas',
+      'machine_name' => 'comparador_tecnicas',
+      'description'  => t('Cátalogo de caracteristícas de Especificaciones Ténicas de comparador'),
+      'module'       => 'comparator',
+    ),
+    'comparador_dimension_e' => (object) array(
+      'name'         => 'Comparador - Dimensiones Exteriores',
+      'machine_name' => 'comparador_dimension_e',
+      'description'  => t('Cátalogo de caracteristícas de Dimensiones Exteriores de comparador'),
+      'module'       => 'comparator',
+    ),
+    'comparador_dimension_i' => (object) array(
+      'name'         => 'Comparador - Dimensiones Interiores',
+      'machine_name' => 'comparador_dimension_i',
+      'description'  => t('Cátalogo de caracteristícas de Dimensiones Interiores de comparador'),
+      'module'       => 'comparator',
+    ),
+    'comparador_peso' => (object) array(
+      'name'         => 'Comparador - Peso y Capacidad',
+      'machine_name' => 'comparador_peso',
+      'description'  => t('Cátalogo de caracteristícas de Peso y Capacidad de comparador'),
+      'module'       => 'comparator',
+    ),
+  );
+
+  foreach($vocabularies_comp as $vocabulary){
+    taxonomy_vocabulary_save($vocabulary);
+  }
+
+  //Se introducen términos default para taxonomias
+  $terms = [
+    'comparador_tecnicas' => [
+      'Motor',
+      'Sistema de ignición',
+      'Transmisión',
+      'Sistema de tracción',
+      'Carrocería',
+      'Suspensión delantera',
+      'Suspensión trasera',
+      'Dirección',
+      'Diámetro de giro',
+      'Frenos delanteros',
+      'Frenos traseros',
+      'Sistema de frenado',
+    ],
+    'comparador_dimension_e' => [
+      'Alto',
+      'Alto con canastilla',
+      'Ancho',
+      'Largo',
+      'Entrevía (del./tras.)',
+      'Distancia al piso',
+    ],
+    'comparador_dimension_i' => [
+      'Espacio para cabeza',
+      'Espacio para cabeza con quemacocos',
+      'Espacio para hombros',
+      'Espacio para cadera',
+      'Espacio para piernas',
+    ],
+    'comparador_peso' => [
+      'Peso total (kg)',
+      'Capacidad de carga (kg)',
+      'Peso de carga de rireles y techo (kg)',
+      'Capacidad de equipaje (L)',
+      'Tanque de combustible',
+      'Pasajeros',
+      'Volumen total disponible para pasajeros (L)',
+      'Rines',
+      'Llantas',
+      'Llanta de refacción',
+    ],
+  ];
+
+  foreach($terms as $voc => $term){
+    $vid = taxonomy_vocabulary_machine_name_load($voc)->vid;
+    $i   = 0;
+    foreach ($term as $name) {
+      taxonomy_term_save((object)array(
+        'vid'    => $vid,
+        'name'   => $name,
+        'weight' => $i,
+      ));
+      ++$i;
+    }//end foreach
+  }//end foreach
+
+  $instances = array(
+    'Vehiculo' => array(
+      'field_name'  => 'field_vehiculo',
+      'label'       => t('Versión'),
+      'description' => t('Versión relacionada a las caracteristícas'),
+      'type'        => 'taxonomy_term_reference',
+      'required'    => true,
+      'widget'      => array(
+        'type' => 'options_select'
+      ),
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'vehiculo',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'color_comp' => array(
+      'field_name'  => 'field_comp_color',
+      'label'       => t('Color'),
+      'description' => t('Seleccione los colores referentes a la versión'),
+      'type'        => 'taxonomy_term_reference',
+      'required'    => true,
+      'widget'      => array(
+        'type' => 'options_select'
+      ),
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'color',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'Exterior' => array(
+      'field_name'  => 'field_comp_exterior',
+      'label'       => t('Exterior'),
+      'description' => t('Seleccione las caracteristícas exteriores para la versión'),
+      'type'        => 'taxonomy_term_reference',
+      'required'    => true,
+      'widget'      => array(
+        'type' => 'options_select'
+      ),
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'comparador_exterior',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'Interior' => array(
+      'field_name'  => 'field_comp_interior',
+      'label'       => t('Interior'),
+      'description' => t('Seleccione las caracteristícas interiores para la versión'),
+      'type'        => 'taxonomy_term_reference',
+      'required'    => true,
+      'widget'      => array(
+        'type' => 'options_select'
+      ),
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'comparador_interior',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'Seguridad' => array(
+      'field_name'  => 'field_comp_seguridad',
+      'label'       => t('Seguridad'),
+      'description' => t('Seleccione las caracteristícas de seguridad para la versión'),
+      'type'        => 'taxonomy_term_reference',
+      'required'    => true,
+      'widget'      => array(
+        'type' => 'options_select'
+      ),
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'comparador_seguridad',
+            'parent'     => 0
+          ),
+        ),
+      ),
+    ),
+    'tecnica' => array(
+      'field_name' => 'field_comp_tecnicas',
+      'label'      => t('Especificaciones Ténicas'),
+      'required'   => false,
+      'widget'     => array(
+        'type' => 'widget_tecnicas'
+      ),
+    ),
+    'dimex' => array(
+      'field_name' => 'field_comp_dimex',
+      'label'      => t('Dimensiones Exteriores'),
+      'required'   => false,
+      'widget'     => array(
+        'type' => 'widget_dimex'
+      ),
+    ),
+    'dimin' => array(
+      'field_name' => 'field_comp_dimin',
+      'label'      => t('Dimensiones Interiores'),
+      'required'   => false,
+      'widget'     => array(
+        'type' => 'widget_dimin'
+      ),
+    ),
+    'peso_cap' => array(
+      'field_name' => 'field_comp_peso',
+      'label'      => t('Peso y Capacidades'),
+      'required'   => false,
+      'widget'     => array(
+        'type' => 'widget_peso'
+      ),
+    ),
+  );
+  foreach ($instances as $instance) {
+    $instance['entity_type'] = 'node';
+    $instance['bundle']      = 'compare_version';
+    field_create_instance($instance);
+  }//end foreach
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function comparator_uninstall() {
+  $query  = 'SELECT nid ';
+  $query .= 'FROM {node} ';
+  $query .= 'WHERE {node}.type = :type ';
+  $result = db_query( $query, array(':type' => 'compare_version') );
+  $nids = array();
+  foreach( $result as $row ) {
+    $nids[] = $row->nid;
+  }//end foreach
+  node_delete_multiple( $nids );
+  foreach( field_info_instances('node', 'compare_version') as $field_name => $instance ) {
+    field_delete_instance($instance);
+  }//end foreach
+  node_type_delete('compare_version');
+
+  $vocabularies_comp = [
+    'comparador_exterior',
+    'comparador_interior',
+    'comparador_seguridad',
+    'comparador_tecnicas',
+    'comparador_dimension_e',
+    'comparador_dimension_i',
+    'comparador_peso',
+  ];
+
+  foreach ($vocabularies_comp as $vocs) {
+    $voc_id = taxonomy_vocabulary_machine_name_load($vocs);
+    taxonomy_vocabulary_delete($voc_id->vid);
+  }
+
+  field_purge_batch(1000);
+
+}
